@@ -1,30 +1,76 @@
 name: Validar Kanban
-on: [push, pull_request]
+
+on:
+  push:
+  pull_request:
+
 permissions:
   contents: read
+
 jobs:
   foundation:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Configurar pnpm
+        uses: pnpm/action-setup@v4
         with:
           version: 11.25.0
-      - uses: actions/setup-node@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm test
-      - run: pnpm test:db
-     - run: node scripts/package.mjs && git diff --ignore-space-at-eol --exit-code -- supabase/install
-      - run: pnpm build
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: |
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Testar arquitetura
+        run: pnpm test
+
+      - name: Testar banco de dados
+        run: pnpm test:db
+
+      - name: Conferir SQL de instalação
+        run: |
+          node scripts/package.mjs
+          git diff --ignore-space-at-eol --exit-code -- supabase/install
+
+      - name: Gerar aplicação
+        run: pnpm build
+
+      - name: Instalar navegador de testes
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Testar interface
+        shell: bash
+        run: |
           pnpm dev > /tmp/globo-preview.log 2>&1 &
-          for attempt in $(seq 1 30); do curl --fail http://127.0.0.1:4174/ && break || sleep 1; done
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+
+          READY=false
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4174/ > /dev/null; then
+              READY=true
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$READY" != "true" ]; then
+            cat /tmp/globo-preview.log
+            exit 1
+          fi
+
           node tests/browser.mjs
-      - uses: actions/upload-artifact@v4
+
+      - name: Salvar pacote validado
+        uses: actions/upload-artifact@v4
         with:
           name: globo-fase-1
           path: |

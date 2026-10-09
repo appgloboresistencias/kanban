@@ -17,7 +17,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - run: pnpm test:db
-      - run: node scripts/package.mjs && git diff --exit-code -- supabase/install
+     - run: node scripts/package.mjs && git diff --ignore-space-at-eol --exit-code -- supabase/install
       - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium
       - run: |

@@ -1,0 +1,33 @@
+name: Validar Kanban
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm test:db
+      - run: node scripts/package.mjs && git diff --exit-code -- supabase/install
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: |
+          pnpm dev > /tmp/globo-preview.log 2>&1 &
+          for attempt in $(seq 1 30); do curl --fail http://127.0.0.1:4174/ && break || sleep 1; done
+          node tests/browser.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: globo-fase-1
+          path: |
+            dist/
+            supabase/
+            tmp/kanban-*.png

@@ -1,0 +1,65 @@
+import {PGlite} from '@electric-sql/pglite';
+import {readFile} from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const db=new PGlite();let checks=0;
+const ok=(v,message)=>{assert.ok(v,message);checks++;console.log('PASS',message);};
+await db.exec(`create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key,email text,raw_user_meta_data jsonb default '{}');create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;`);
+// Simula coexistência com a v1: migration não pode alterar seus registros.
+await db.exec(`create table public.profiles(id uuid primary key,role text);insert into public.profiles values('00000000-0000-4000-8000-000000000099','legacy');`);
+for(const file of ['202610090001_foundation.sql','202610090002_catalog.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
+const ids=Array.from({length:5},(_,i)=>`00000000-0000-4000-8000-00000000000${i+1}`),[admin,sales,other,design,inactive]=ids;
+for(const [i,id] of ids.entries())await db.query(`insert into auth.users(id,email) values($1,$2)`,[id,`user${i}@example.test`]);
+await db.exec(`update kanban.profiles set active=true where id<>'${inactive}';insert into kanban.user_roles values('${admin}','admin'),('${sales}','sales'),('${other}','sales'),('${design}','design'),('${inactive}','sales');`);
+async function as(id){await db.exec(`reset role;set role authenticated;select set_config('request.jwt.claim.sub','${id}',false);`);}
+async function call(name,args=[]){return(await db.query(`select public.kb_${name}(${args.map((_,i)=>'$'+(i+1)).join(',')}) result`,args)).rows[0].result;}
+async function denied(fn,pattern,label){await assert.rejects(fn,pattern);checks++;console.log('PASS',label);}
+await as(sales);
+ok((await call('bootstrap')).products.length===8,'oito produtos e entrevistas disponíveis');
+await denied(()=>call('save_customer',[null,0,{legal_name:'Cliente inválido',contact:'Pessoa',tax_id:'11111111111'}]),/inválido/,'validação CPF');
+const customer=await call('save_customer',[null,0,{legal_name:'Indústria de teste',contact:'Contato',tax_id:'11222333000181'}]);
+ok(!!customer,'cliente com CNPJ válido');
+ok(!!(await call('save_customer',[null,0,{legal_name:'Cliente alfanumérico de teste',contact:'Contato',tax_id:'12.ABC.345/01DE-35'}])),'CNPJ alfanumérico validado pelo algoritmo oficial');
+await denied(()=>call('save_customer',[null,0,{legal_name:'Duplicado',contact:'Pessoa',tax_id:'11.222.333/0001-81'}]),/Já existe/,'documento duplicado bloqueado');
+const data={title:'Resistência de teste',customer_id:customer,product_id:'tubular',answers:{},technical_complete:false};
+const id=crypto.randomUUID();await call('save_demand',[id,0,data]);
+let detail=await call('detail',[id]);ok(detail.number.startsWith('ORC-')&&detail.version===1,'numeração e versão inicial');
+await denied(()=>call('save_demand',[id,null,data]),/Conflito/,'versão nula não contorna concorrência');
+await denied(()=>call('start',[id,null]),/Conflito/,'início não aceita versão nula');
+await denied(()=>call('transition',[id,null,'design',design,'Injeção de versão nula',crypto.randomUUID()]),/Conflito/,'transição não aceita versão nula');
+ok(detail.missing.length>0,'rascunho persiste com pendências');
+await denied(()=>call('transition',[id,1,'production',sales,'Avançar etapa',crypto.randomUUID()]),/Transição não disponível/,'salto de etapa bloqueado no banco');
+await denied(()=>call('transition',[id,1,'design',design,'Levantamento completo',crypto.randomUUID()]),/Pendências/,'avanço incompleto bloqueado');
+await as(other);ok((await call('board')).cards.length===0,'vendedor não vê orçamento de colega');
+await denied(()=>call('detail',[id]),/indisponível/,'detalhe alheio protegido');
+ok((await db.query('select * from kanban.demands')).rows.length===0,'RLS protege acesso direto');
+await denied(()=>db.query(`update kanban.demands set stage='production' where id=$1`,[id]),/permission denied/,'escrita direta bloqueada');
+await denied(()=>call('set_user',[other,true,['admin']]),/administrativo/,'elevação de privilégio bloqueada');
+await as(inactive);await denied(()=>call('bootstrap'),/inativo/,'usuário inativo bloqueado');
+await as(sales);
+const answers={voltage:'220',power:'1000',current:'4.55',quantity:'1',medium:'Ar',cold:'0',application:'Forno',material:'Inox'};
+await call('save_demand',[id,1,{...data,answers,technical_complete:true}]);
+await denied(()=>call('save_demand',[id,1,data]),/Conflito/,'edição concorrente não sobrescreve');
+await denied(()=>call('transition',[id,2,'design',design,'Levantamento completo',crypto.randomUUID()]),/Desenho confirmado/,'documento obrigatório exige confirmação real');
+await db.exec('reset role');await db.query(`insert into kanban.documents(demand_id,kind,name,provider_id,confirmed) values($1,'drawing','desenho de fixture','fixture-only',true)`,[id]);
+await as(sales);await call('start',[id,2]);
+const request=crypto.randomUUID();const v=await call('transition',[id,3,'design',design,'Levantamento conferido',request]);
+ok(v===4,'transição atômica com documento confirmado de teste');
+ok(await call('transition',[id,3,'design',design,'Repetição',request])===4,'movimentação idempotente');
+await as(design);await call('start',[id,4]);await call('transition',[id,5,'sales',sales,'Solicitar informação complementar',crypto.randomUUID()]);
+await as(sales);detail=await call('detail',[id]);ok(detail.stage==='sales'&&!detail.technical_complete,'retorno reabre levantamento');
+ok((await db.query('select * from kanban.stage_executions where demand_id=$1',[id])).rows.length===3,'retorno preserva execuções anteriores');
+ok((await call('history',[id])).filter(e=>e.type==='transition').length===2,'histórico sem duplicação de retry');
+await denied(()=>db.query('delete from kanban.audit_events'),/permission denied/,'auditoria imutável para usuário');
+await as(admin);await call('set_user',[other,true,['sales','design']]);await as(other);ok((await call('bootstrap')).roles.length===2,'múltiplos perfis por usuário');
+await as(admin);await denied(()=>call('set_user',[admin,false,['sales']]),/próprio acesso/,'administrador não remove próprio acesso');
+await call('assign',[id,6,other,'Redistribuição de carteira']);await as(other);ok((await call('detail',[id])).assignee_id===other,'transferência auditada');
+// Chamadas concorrentes no cliente: PGlite serializa a conexão; teste SQL real multissessão é separado.
+const concurrent=await Promise.all([call('save_demand',[crypto.randomUUID(),0,data]),call('save_demand',[crypto.randomUUID(),0,data])]);
+const numbers=await Promise.all(concurrent.map(id=>call('detail',[id]).then(d=>d.number)));
+ok(new Set(numbers).size===2,'numeração única em solicitações concorrentes no cliente');
+for(let i=0;i<31;i++)await call('save_demand',[crypto.randomUUID(),0,{...data,title:'Página '+i}]);
+const first=await call('board');const last=first.cards[29];const next=await call('board',['',null,last.created_at,last.id]);
+ok(first.cards.length===31&&next.cards.every(c=>!first.cards.slice(0,30).some(p=>p.id===c.id)),'paginação por cursor sem duplicação');
+await db.exec('reset role');ok((await db.query('select role from public.profiles')).rows[0].role==='legacy','dados da versão anterior preservados');
+await db.exec('set role anon');await denied(()=>call('board'),/permission denied/,'acesso anônimo bloqueado');
+await db.close();console.log(`\n${checks} verificações passaram. Nenhuma chamada ao Supabase ou Google Drive.`);

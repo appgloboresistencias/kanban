@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {readFile,readdir} from 'node:fs/promises';
+test('frontend não consulta Google Drive nem contém segredos administrativos',async()=>{for(const name of await readdir(new URL('../src/',import.meta.url))){const text=await readFile(new URL('../src/'+name,import.meta.url),'utf8');assert.doesNotMatch(text,/(?:www\.)?googleapis\.com\/(?:drive|upload)|GOOGLE_CLIENT_SECRET|SERVICE_ROLE_KEY|GOOGLE_REFRESH_TOKEN/);}});
+test('schema isolado sem alteração de tabelas legadas',async()=>{const sql=await readFile(new URL('../supabase/migrations/202610090001_foundation.sql',import.meta.url),'utf8');assert.doesNotMatch(sql,/alter table public\.(profiles|orders)|drop table/i);});

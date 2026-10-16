@@ -1,0 +1,5 @@
+export type Provider='supabase'|'google_drive';
+export type DocumentRecord={id:string;demand_id:string;execution_id:string;name:string;original_filename:string|null;stored_filename:string;mime_type:string;size_bytes:number;storage_provider:Provider;bucket_name:string;storage_path:string;google_drive_file_id:string|null;status:'pending'|'ready'|'archived'|'legacy'|'cancelled';checksum:string;version:number;kind:string;created_at:string;uploaded_at:string|null;uploaded_by:string;uploader?:string;stage?:string;migration_status:string};
+export type StorageConfig={document_api:number;capacity_bytes:number;photo_limit:number;pdf_limit:number;office_limit:number;used_bytes:number;checked_at:string|null;default_provider:Provider;google_enabled:boolean};
+export interface StorageAdapter{uploadDocument(document:DocumentRecord,file:Blob):Promise<void>;downloadDocument(document:DocumentRecord):Promise<Blob>}
+export const kinds:Record<string,string>={interview:'Entrevista (PDF)',proposal:'Proposta',approval:'Aprovação',technical:'Documento técnico',materials:'Materiais / OP',quality:'Qualidade',delivery:'Entrega',other:'Outro'};

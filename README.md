@@ -1,6 +1,14 @@
 # Globo Resistências — Kanban 2.0
 
-Fase 1: fundação em React + TypeScript, Supabase Auth e PostgreSQL. Repositório oficial: https://github.com/appgloboresistencias/kanban.
+> Implementação atual: [Documentos temporários 2.4](VERSAO-2-4.md), pronta para homologação. Auditoria de acesso remoto em [AUDITORIA-STORAGE.md](AUDITORIA-STORAGE.md).
+
+> Versão atual para testes: [Fluxo completo 2.3](VERSAO-2-3.md). Use o SQL e o pacote web dessa versão no ambiente existente.
+
+> Atualização mais recente: [Correção Projeto → Orçamento](CORRECAO-2-1.md). Para ambientes já na versão 2, aplique essa correção.
+
+Versão 2: levantamento livre no card e referência ao PDF escolhido no Google Drive, sem cadastro de tipos nem questionário técnico. React + TypeScript, Supabase Auth e PostgreSQL. Repositório oficial: https://github.com/appgloboresistencias/kanban.
+
+**Para atualizar o ambiente existente, siga [VERSAO-2.md](VERSAO-2.md).** Os documentos de Fase 1 abaixo são históricos.
 
 Leia [INSTALACAO.md](INSTALACAO.md) e [FASE-1.md](FASE-1.md). Arquitetura aprovada: [AUDITORIA-FASE-0.md](AUDITORIA-FASE-0.md).
 

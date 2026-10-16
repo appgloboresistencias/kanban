@@ -1,5 +1,11 @@
 # Instalação da Fase 1
 
+> Implementação atual: [Documentos temporários 2.4](VERSAO-2-4.md), pronta para homologação. Auditoria de acesso remoto em [AUDITORIA-STORAGE.md](AUDITORIA-STORAGE.md).
+
+> Versão atual para testes: [Fluxo completo 2.3](VERSAO-2-3.md). Use o SQL e o pacote web dessa versão no ambiente existente.
+
+> Documento histórico. Para o ambiente já instalado, use somente a atualização descrita em [VERSAO-2.md](VERSAO-2.md). Não repita este instalador.
+
 A versão anterior permanece em uso. Esta fase deve ser homologada antes de qualquer substituição. Não há migration automática no navegador, no CI ou no build.
 
 ## 1. Inventário e backup

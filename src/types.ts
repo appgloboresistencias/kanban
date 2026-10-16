@@ -1,10 +1,8 @@
 export type Role='admin'|'manager'|'sales'|'design'|'estimator'|'warehouse'|'production'|'quality'|'delivery';
 export type Field={key:string;label:string;type:'text'|'number'|'select';unit?:string;min?:number;options?:string[];when?:[string,string]};
-export type Template={id:string;product_id:string;version:number;fields:Field[];requires_drawing:boolean};
 export type Person={id:string;name:string;roles:Role[]};
-export type Product={id:string;name:string;active:boolean;template:Template};
-export type Bootstrap={profile:{id:string;name:string;email:string};roles:Role[];products:Product[];stages:{code:string;name:string;position:number;role:Role}[];people:Person[]};
+export type Bootstrap={api_version:number;workflow_version:number;profile:{id:string;name:string;email:string};roles:Role[];stages:{code:string;name:string;position:number;role:Role}[];people:Person[]};
 export type Customer={id:string;version:number;legal_name:string;trade_name:string;tax_id:string;contact:string;phone:string;email:string};
-export type Card={id:string;number:string;title:string;customer_id:string;customer:string;assignee_id:string;assignee:string;stage:string;version:number;created_at:string;entered_at:string;started_at:string|null;requested_date:string|null;missing:string[]};
-export type Detail=Card & {description:string;notes:string;technical_complete:boolean;can_edit:boolean;execution:{started_at:string|null};item:{answers:Record<string,string>;template:Template}};
+export type Card={stage_data?:Record<string,string|boolean>;agreed_delivery_date:string|null;status:'open'|'completed'|'rejected';materials_pending:{description:string;expected_date:string}|null;rework_count:number;id:string;number:string;title:string;customer_id:string;customer:string;assignee_id:string;assignee:string;stage:string;version:number;created_at:string;entered_at:string;started_at:string|null;requested_date:string|null;missing:string[]};
+export type Detail=Card & {description:string;notes:string;technical_complete:boolean;technical_notes:string;interview_pdf_url:string;interview_pdf_name:string;survey_format:number;can_edit:boolean;execution:{started_at:string|null;data:Record<string,string|boolean>}|null;cycles:{id:string;stage:string;assignee_id:string;entered_at:string;completed_at:string|null;data:Record<string,string|boolean>}[];legacy_interview:{product_name:string;version:number;answers:Record<string,unknown>;fields:Field[]}|null};
 export type Event={id:number;type:string;description:string;actor:string;created_at:string;before_data:unknown;after_data:unknown};

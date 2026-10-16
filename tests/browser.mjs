@@ -1,3 +1,4 @@
+process.env.TEST_DOCUMENTS='1';
 import {storageFixture} from './storage-fixture.mjs';
 // Teste local: autenticação simulada; todas as RPCs executam SQL real em PGlite.
 // Nenhum pedido ou credencial de produção é usado.
@@ -8,7 +9,7 @@ import assert from 'node:assert/strict';
 const db=new PGlite();
 await db.exec(`create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key,email text,raw_user_meta_data jsonb default '{}');create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;`);
 await storageFixture(db);
-for(const f of ['202610090001_foundation.sql','202610090002_catalog.sql','202610090003_free_interview.sql','202610090004_design_quotation.sql','202610090005_quotation_approval.sql','202610090006_complete_workflow.sql','20261016125041_temporary_document_storage.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+f,import.meta.url),'utf8'));
+for(const f of ['202610090001_foundation.sql','202610090002_catalog.sql','202610090003_free_interview.sql','202610090004_design_quotation.sql','202610090005_quotation_approval.sql','202610090006_complete_workflow.sql','20261016125041_temporary_document_storage.sql','20261016133521_interview_library.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+f,import.meta.url),'utf8'));
 const uid='11111111-1111-4111-8111-111111111111';
 const designer='44444444-4444-4444-8444-444444444444';
 await db.exec(`insert into auth.users(id,email,raw_user_meta_data) values('${uid}','teste@example.test','{"name":"Vendedor Teste"}'),('${designer}','projeto@example.test','{"name":"Projetista Teste"}');update kanban.profiles set active=true;insert into kanban.user_roles values('${uid}','admin'),('${uid}','estimator'),('${uid}','sales'),('${uid}','design'),('${designer}','design'),('${designer}','estimator');set role authenticated;select set_config('request.jwt.claim.sub','${uid}',false);`);
@@ -39,10 +40,21 @@ await route.fulfill({status,contentType:'application/json',body:JSON.stringify(b
 try{
 await page.goto(process.env.TEST_URL||'http://127.0.0.1:4174');
 await page.getByLabel('E-mail',{exact:true}).fill('teste@example.test');await page.getByLabel('Senha',{exact:true}).fill('fixture-password');await page.getByRole('button',{name:'Entrar no sistema'}).click();
+failUpload=false;
+await page.getByRole('button',{name:'Modelos de entrevista',exact:false}).click();
+await page.getByLabel('Título do modelo').fill('Entrevista de aplicação');
+await page.getByLabel('PDF com perguntas').setInputFiles({name:'perguntas.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.4\nperguntas de teste\n%%EOF')});
+await page.getByRole('button',{name:'Cadastrar modelo',exact:true}).click();
+await page.getByRole('button',{name:'Consultar perguntas',exact:true}).waitFor();
+await page.screenshot({path:'tmp/biblioteca-desktop.png',fullPage:true});
+failUpload=true;
 await page.getByRole('button',{name:'Clientes',exact:false}).click();await page.getByRole('button',{name:'Cadastrar cliente'}).click();
 await page.getByLabel('Razão social').fill('Metalúrgica Horizonte');await page.getByLabel('Contato *',{exact:true}).fill('Contato Teste');await page.getByLabel('CPF/CNPJ').fill('11222333000181');await page.getByRole('button',{name:'Salvar cliente',exact:true}).click();
 await page.getByRole('cell',{name:'Metalúrgica Horizonte',exact:true}).waitFor();
 await page.getByRole('button',{name:'Quadro de demandas'}).click();await page.getByRole('button',{name:'Novo orçamento'}).click();
+await page.getByRole('button',{name:'Consultar perguntas',exact:true}).click();
+await page.getByTitle('Perguntas da entrevista').waitFor();await page.getByRole('button',{name:'Fechar perguntas'}).click();
+assert.doesNotMatch(await page.locator('body').innerText(),/Google|Drive/);
 await page.getByLabel('Nome da demanda').fill('Resistência para extrusora');
 const customer=(await db.query('select id from kanban.customers')).rows[0].id;
 await page.getByLabel('Cliente *',{exact:true}).selectOption(customer);
@@ -51,9 +63,6 @@ assert.equal(await page.getByLabel('Tipo de resistência').count(),0);
 assert.equal(await page.getByLabel('Tensão').count(),0);
 const notes='Cliente solicita resistência para extrusora.\nMedidas e aplicação registradas conforme entrevista no PDF.\nPrazo e detalhes ainda em levantamento.';
 await page.getByLabel('Levantamento técnico / informações do cliente').fill(notes);
-if(process.env.TEST_DOCUMENTS!=='1')await page.getByLabel('Link externo do PDF (opcional se anexado)').fill('https://drive.google.com/file/d/0123456789abcdef/view');
-await page.getByLabel('Nome ou versão do PDF').fill('Entrevista do cliente — revisão 02.pdf');
-if(process.env.TEST_DOCUMENTS!=='1')assert.equal(await page.getByRole('link',{name:'Abrir PDF de referência'}).getAttribute('href'),'https://drive.google.com/file/d/0123456789abcdef/view');
 await page.screenshot({path:new URL('../tmp/versao-2-levantamento.png',import.meta.url).pathname.replace(/^\/([A-Za-z]:)/,'$1'),fullPage:true});
 await page.getByRole('button',{name:'Salvar levantamento'}).click();
 await page.getByText('Salvo no Supabase · versão 1',{exact:true}).waitFor();
@@ -108,7 +117,7 @@ await finish('approval',{'Versão da proposta':'R1','Data de envio ao cliente':'
 await start();
 await page.screenshot({path:'tmp/fluxo-aprovacao.png',fullPage:true});
 await finish('op',{'Versão aprovada':'R1','Data da aprovação do cliente':'2026-01-02','Meio de aprovação (e-mail, telefone, etc.)':'E-mail','Referência da comunicação / evidência':'Mensagem ABC','Prazo de entrega acordado':'2026-12-31','O cliente aprovou esta versão da proposta':true,'Conferi a aprovação e autorizo internamente esta versão':true});
-await start();await finish('warehouse',{'Número oficial da OP no ERP':'OP-123','Data de emissão da OP':'2026-01-03','Lista de materiais / referência no Drive':'Aço e cabos conferidos'});
+await start();await finish('warehouse',{'Número oficial da OP no ERP':'OP-123','Data de emissão da OP':'2026-01-03','Lista de materiais / referência dos documentos':'Aço e cabos conferidos'});
 await start();await finish('production',{'Situação dos materiais':'total'});
 await start();await finish('quality',{'Serviço executado / retrabalho':'Produzido e testado'});
 await start();await finish('production',{'Resultado da inspeção / não conformidade':'Reprovado: ajustar conexão'});

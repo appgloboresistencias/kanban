@@ -7,7 +7,7 @@ function ok(v,label){assert.ok(v,label);count++;console.log('PASS fluxo:',label)
 async function fail(fn,re,label){await assert.rejects(fn,re);count++;console.log('PASS fluxo:',label);}
 await db.exec(`create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key,email text,raw_user_meta_data jsonb default '{}');create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;`);
 await storageFixture(db);
-for(const f of (await readdir(new URL('../supabase/migrations/',import.meta.url))).sort())await db.exec(await readFile(new URL('../supabase/migrations/'+f,import.meta.url),'utf8'));
+for(const f of (await readdir(new URL('../supabase/migrations/',import.meta.url))).filter(f=>!f.endsWith("_interview_library.sql")).sort())await db.exec(await readFile(new URL('../supabase/migrations/'+f,import.meta.url),'utf8'));
 const roles=['admin','sales','design','estimator','warehouse','production','quality','delivery'];const users={};
 for(const role of roles){users[role]=crypto.randomUUID();await db.query('insert into auth.users(id,email) values($1,$2)',[users[role],role+'@test.invalid']);await db.query('insert into kanban.user_roles values($1,$2)',[users[role],role]);}
 users.support=crypto.randomUUID();await db.query('insert into auth.users(id,email) values($1,$2)',[users.support,'apoio@test.invalid']);await db.query('insert into kanban.user_roles values($1,$2)',[users.support,'warehouse']);

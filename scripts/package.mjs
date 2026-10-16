@@ -20,3 +20,5 @@ console.log('Versão 2: atualização preservando dados e instalação nova gera
 const storage=await readFile('supabase/migrations/20261016125041_temporary_document_storage.sql','utf8');
 await writeFile('supabase/install/VERSAO-2-4-DOCUMENTOS.sql',storage);
 console.log('SQL incremental 2.4 gerado. Aplicar somente sobre 2.3 validada.');
+
+await writeFile('supabase/install/VERSAO-2-5-ENTREVISTAS.sql',await readFile('supabase/migrations/20261016133521_interview_library.sql','utf8'));

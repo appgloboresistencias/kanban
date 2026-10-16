@@ -1,49 +1,11 @@
-# Globo Resistências — Kanban 2.0
+# Globo Resistências — Kanban 2.5
 
-> Implementação atual: [Documentos temporários 2.4](VERSAO-2-4.md), pronta para homologação. Auditoria de acesso remoto em [AUDITORIA-STORAGE.md](AUDITORIA-STORAGE.md).
+Biblioteca de PDFs com perguntas, levantamento livre e respostas/anexos privados no Supabase Storage. Fluxo completo de Vendas até Entrega.
 
-> Versão atual para testes: [Fluxo completo 2.3](VERSAO-2-3.md). Use o SQL e o pacote web dessa versão no ambiente existente.
-
-> Atualização mais recente: [Correção Projeto → Orçamento](CORRECAO-2-1.md). Para ambientes já na versão 2, aplique essa correção.
-
-Versão 2: levantamento livre no card e referência ao PDF escolhido no Google Drive, sem cadastro de tipos nem questionário técnico. React + TypeScript, Supabase Auth e PostgreSQL. Repositório oficial: https://github.com/appgloboresistencias/kanban.
-
-**Para atualizar o ambiente existente, siga [VERSAO-2.md](VERSAO-2.md).** Os documentos de Fase 1 abaixo são históricos.
-
-Leia [INSTALACAO.md](INSTALACAO.md) e [FASE-1.md](FASE-1.md). Arquitetura aprovada: [AUDITORIA-FASE-0.md](AUDITORIA-FASE-0.md).
+Siga [VERSAO-2-5.md](VERSAO-2-5.md) para instalar, limpar os testes e publicar. O SQL de limpeza é separado da atualização e preserva usuários e modelos.
 
 ## Desenvolvimento
 
-Node 24 e pnpm 11.25.0:
+Node 24 e pnpm. Execute `pnpm install --frozen-lockfile`, `pnpm test`, `pnpm test:db` e `pnpm build`. Para testar no navegador, inicie `pnpm dev` e execute `node tests/browser.mjs` com Chromium do Playwright instalado ou TEST_CHROMIUM_PATH configurado.
 
-```sh
-pnpm install --frozen-lockfile
-pnpm dev
-pnpm test
-pnpm test:db
-pnpm build
-```
-
-URL local: http://127.0.0.1:4174. O aplicativo usa o banco real configurado; não contém modo demonstração nem fallback em memória. Sem migrations/perfis ativos, mostra erro de instalação/acesso. Credenciais Supabase publicáveis ficam em `.env.example`; segredos não pertencem ao frontend.
-
-## Teste de interface isolado
-
-Com servidor local iniciado:
-
-```sh
-pnpm exec playwright install chromium
-node tests/browser.mjs
-```
-
-Opcionalmente `TEST_CHROMIUM_PATH` seleciona um Chromium/Edge já instalado. O teste intercepta a API Supabase em um navegador isolado, simula apenas Auth e executa as RPCs contra PostgreSQL WASM efêmero. Não usa contas nem dados reais. Isso não substitui homologação com Supabase Auth real. Screenshots em `tmp/` não entram no Git.
-
-## Estrutura
-
-- `src/`: interface, tipos e cliente RPC.
-- `supabase/migrations/`: schema isolado, políticas, motor transacional e catálogo técnico.
-- `supabase/install/`: SQL combinado para instalação manual.
-- `tests/`: verificações de arquitetura, integração SQL/RLS e navegador.
-- `.github/workflows/`: CI sem deploy automático.
-- `public/_headers`: cabeçalhos de segurança Cloudflare Pages; ajustar origem Supabase se mudar de projeto.
-
-As etapas após Projeto permanecem bloqueadas. A ausência do Drive na Fase 1 não é contornada: anexos obrigatórios precisam da Fase 2 para permitir avanço em produção.
+As migrations históricas preservam a evolução do banco; não execute instaladores antigos no ambiente existente. Testes SQL usam PGlite descartável. Testes de navegador simulam Auth/Storage e não substituem homologação conectada.

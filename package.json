@@ -1,13 +1,13 @@
 {
   "name": "globo-kanban",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 4174",
     "build": "tsc --noEmit && vite build",
     "test": "node --test --experimental-test-isolation=none tests/*.test.mjs",
-    "test:db": "node tests/database.mjs && node tests/version2.mjs && node tests/workflow.mjs && node tests/documents.mjs"
+    "test:db": "node tests/database.mjs && node tests/version2.mjs && node tests/workflow.mjs && node tests/documents.mjs && node tests/interviews.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.117.3",
